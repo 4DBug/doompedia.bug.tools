@@ -1,0 +1,28 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>doompedia.bug.tools</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header id="category-header">
+      <nav>
+        <ul>
+          <li data-category="random">Random</li>
+          <li data-category="featured" class="active">Featured</li>
+          <li data-category="alphabetical">Alphabetical</li>
+        </ul>
+      </nav>
+    </header>
+    <main id="articles-container"></main>
+    <div id="loading" class="hidden">
+      <div class="spinner">
+        <svg viewBox="0 0 50 50">
+          <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+        </svg>
+      </div>
+    </div>
+    <script src="script.js" type="module"></script>
+  </body>
+</html>
