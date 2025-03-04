@@ -61,7 +61,7 @@ function createArticleFrame(page) {
   container.dataset.frameHeight = frameHeight;
 
   const pid = page.pageid || page.id;
-  const iframe = createIframe(`https:
+  const iframe = createIframe(`https://en.wikipedia.org/?curid=${pid}`, frameHeight);
   contentDiv.appendChild(iframe);
   container.appendChild(contentDiv);
 
@@ -87,6 +87,7 @@ function createArticleFrame(page) {
   return wrapper;
 }
 
+
 const observerOptions = {
   rootMargin: '0px',
   threshold: 0.1
@@ -97,7 +98,7 @@ const articleObserver = new IntersectionObserver((entries) => {
     const wrapper = entry.target;
     const container = wrapper.querySelector('.article-frame-container');
     const contentDiv = wrapper.querySelector('.article-content');
-
+    
     if (!entry.isIntersecting) {
       if (contentDiv.firstChild && contentDiv.firstChild.tagName === 'IFRAME') {
         const frameHeight = container.dataset.frameHeight;
@@ -109,11 +110,10 @@ const articleObserver = new IntersectionObserver((entries) => {
         contentDiv.replaceChild(placeholder, contentDiv.firstChild);
       }
     } else {
-
       if (contentDiv.firstChild && contentDiv.firstChild.tagName === 'DIV') {
         const frameHeight = container.dataset.frameHeight;
         const pageid = contentDiv.firstChild.dataset.pageid;
-        const iframe = createIframe(`https:
+        const iframe = createIframe(`https://en.wikipedia.org/?curid=${pageid}`, frameHeight);
         contentDiv.replaceChild(iframe, contentDiv.firstChild);
       }
     }
