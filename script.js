@@ -1,36 +1,53 @@
 const articlesContainer = document.getElementById('articles-container');
 const loadingIndicator = document.getElementById('loading');
-
 let isLoading = false;
 let scrollTimeout;
 let currentCategory = 'featured';
 let apContinue = '';
 let cmContinue = '';
 
-const endpoints = {
-  random:
-    'https://en.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=10&format=json&origin=*',
-  featured:
-    'https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:Featured_articles&cmlimit=10&cmsort=timestamp&cmdir=desc&format=json&origin=*',
-  alphabetical:
-    'https://en.wikipedia.org/w/api.php?action=query&list=allpages&apnamespace=0&apfilterredir=nonredirects&aplimit=10&format=json&origin=*'
-};
+const randomUrl =
+  'https://en.wikipedia.org/w/api.php?action=query&list=random&rnnamespace=0&rnlimit=10&format=json&origin=*';
 
-function getApiEndpoint() {
-  if (currentCategory === 'random') {
-    return endpoints.random;
-  } else if (currentCategory === 'alphabetical') {
-    return apContinue
-      ? endpoints.alphabetical + '&apcontinue=' + encodeURIComponent(apContinue)
-      : endpoints.alphabetical;
-  } else if (currentCategory === 'featured') {
-    return cmContinue
-      ? endpoints.featured + '&cmcontinue=' + encodeURIComponent(cmContinue)
-      : endpoints.featured;
-  }
+function getFeaturedUrl() {
+  const baseUrl =
+    'https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:Featured_articles&cmlimit=10&cmsort=timestamp&cmdir=desc&format=json&origin=*';
+  return cmContinue ? `${baseUrl}&cmcontinue=${encodeURIComponent(cmContinue)}` : baseUrl;
 }
 
-function createIframe(src, height) {
+function getAlphabeticalUrl() {
+  const baseUrl =
+    'https://en.wikipedia.org/w/api.php?action=query&list=allpages&apnamespace=0&apfilterredir=nonredirects&aplimit=10&format=json&origin=*';
+  return apContinue ? `${baseUrl}&apcontinue=${encodeURIComponent(apContinue)}` : baseUrl;
+}
+
+const unloadObserver = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      const wrapper = entry.target;
+      const container = wrapper.querySelector('.article-frame-container');
+      const contentDiv = wrapper.querySelector('.article-content');
+      if (!entry.isIntersecting && contentDiv.firstChild.tagName === 'IFRAME') {
+        const frameHeight = container.dataset.frameHeight;
+        const placeholder = document.createElement('div');
+        placeholder.className = 'placeholder';
+        placeholder.style.height = `${frameHeight}px`;
+        placeholder.dataset.pageid = contentDiv.firstChild.src.split('curid=')[1];
+        contentDiv.replaceChild(placeholder, contentDiv.firstChild);
+      } else if (entry.isIntersecting && contentDiv.firstChild.tagName === 'DIV') {
+        const frameHeight = container.dataset.frameHeight;
+        const pageid = contentDiv.firstChild.dataset.pageid;
+        const iframe = createIframeElement(`https://en.wikipedia.org/?curid=${pageid}`, frameHeight);
+        contentDiv.replaceChild(iframe, contentDiv.firstChild);
+      }
+    });
+  },
+  {
+    rootMargin: '-500px 0px -500px 0px'
+  }
+);
+
+function createIframeElement(src, height) {
   const iframe = document.createElement('iframe');
   iframe.className = 'article-iframe';
   iframe.src = src;
@@ -39,118 +56,104 @@ function createIframe(src, height) {
   return iframe;
 }
 
-function createArticleFrame(page) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'article-wrapper';
-
-  const title = document.createElement('h1');
-  title.className = 'article-title';
-  title.textContent = page.title;
-  wrapper.appendChild(title);
-
-  const container = document.createElement('div');
-  container.className = 'article-frame-container';
-
-  const contentDiv = document.createElement('div');
-  contentDiv.className = 'article-content';
-
-  const isMobile = window.innerWidth <= 768;
-  const baseHeight = isMobile ? window.innerHeight : 600;
-  const extraMargin = isMobile ? 245 : 204;
-  const frameHeight = baseHeight + extraMargin;
-  container.dataset.frameHeight = frameHeight;
-
-  const pid = page.pageid || page.id;
-  const iframe = createIframe(`https://en.wikipedia.org/?curid=${pid}`, frameHeight);
-  contentDiv.appendChild(iframe);
-  container.appendChild(contentDiv);
-
-  const expandButton = document.createElement('button');
-  expandButton.className = 'expand-button';
-  expandButton.textContent = 'Expand';
-  let expandCount = 0;
-  expandButton.addEventListener('click', () => {
-    expandCount++;
-    const newBaseHeight = isMobile ? window.innerHeight : 600;
-    const newContainerHeight = newBaseHeight + expandCount * 300;
-    container.style.height = `${newContainerHeight}px`;
-    const newFrameHeight = newContainerHeight + extraMargin;
-    container.dataset.frameHeight = newFrameHeight;
-
-    if (contentDiv.firstChild) {
-      contentDiv.firstChild.style.height = `${newFrameHeight}px`;
-    }
-    expandButton.textContent = expandCount > 1 ? `Expand (${expandCount}×)` : 'Expand';
-  });
-  container.appendChild(expandButton);
-  wrapper.appendChild(container);
-  return wrapper;
-}
-
-
-const observerOptions = {
-  rootMargin: '0px',
-  threshold: 0.1
-};
-
-const articleObserver = new IntersectionObserver((entries) => {
-  entries.forEach((entry) => {
-    const wrapper = entry.target;
-    const container = wrapper.querySelector('.article-frame-container');
-    const contentDiv = wrapper.querySelector('.article-content');
-    
-    if (!entry.isIntersecting) {
-      if (contentDiv.firstChild && contentDiv.firstChild.tagName === 'IFRAME') {
-        const frameHeight = container.dataset.frameHeight;
-        const pageid = contentDiv.firstChild.src.split('curid=')[1];
-        const placeholder = document.createElement('div');
-        placeholder.className = 'placeholder';
-        placeholder.style.height = `${frameHeight}px`;
-        placeholder.dataset.pageid = pageid;
-        contentDiv.replaceChild(placeholder, contentDiv.firstChild);
-      }
-    } else {
-      if (contentDiv.firstChild && contentDiv.firstChild.tagName === 'DIV') {
-        const frameHeight = container.dataset.frameHeight;
-        const pageid = contentDiv.firstChild.dataset.pageid;
-        const iframe = createIframe(`https://en.wikipedia.org/?curid=${pageid}`, frameHeight);
-        contentDiv.replaceChild(iframe, contentDiv.firstChild);
-      }
-    }
-  });
-}, observerOptions);
-
 async function fetchArticles() {
   if (isLoading) return;
   isLoading = true;
-  loadingIndicator.classList.remove('hidden');
-
-  const apiUrl = getApiEndpoint();
+  showLoading(true);
+  let apiEndpoint;
+  if (currentCategory === 'random') {
+    apiEndpoint = randomUrl;
+  } else if (currentCategory === 'alphabetical') {
+    apiEndpoint = getAlphabeticalUrl();
+  } else {
+    apiEndpoint = getFeaturedUrl();
+  }
   try {
-    const response = await fetch(apiUrl);
+    const response = await fetch(apiEndpoint);
     const data = await response.json();
     let pages = [];
     if (currentCategory === 'random') {
       pages = data.query.random;
     } else if (currentCategory === 'alphabetical') {
       pages = data.query.allpages;
-      apContinue = data.continue && data.continue.apcontinue ? data.continue.apcontinue : '';
-    } else if (currentCategory === 'featured') {
+      if (data.continue) {
+        apContinue = data.continue.apcontinue;
+      } else {
+        apContinue = '';
+      }
+    } else {
       pages = data.query.categorymembers;
-      cmContinue = data.continue && data.continue.cmcontinue ? data.continue.cmcontinue : '';
+      if (data.continue) {
+        cmContinue = data.continue.cmcontinue;
+      } else {
+        cmContinue = '';
+      }
     }
-
     const fragment = document.createDocumentFragment();
     pages.forEach((page) => {
-      const article = createArticleFrame(page);
-      fragment.appendChild(article);
-      articleObserver.observe(article);
+      const articleFrame = createArticleFrame(page);
+      fragment.appendChild(articleFrame);
+      unloadObserver.observe(articleFrame);
     });
     articlesContainer.appendChild(fragment);
   } catch (error) {
-    console.error('Error fetching articles:', error);
+    console.error(error);
   } finally {
     isLoading = false;
+    showLoading(false);
+  }
+}
+
+function createArticleFrame(page) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'article-wrapper';
+  const title = document.createElement('h1');
+  title.className = 'article-title';
+  title.textContent = page.title;
+  wrapper.appendChild(title);
+  const container = document.createElement('div');
+  container.className = 'article-frame-container';
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'article-content';
+  const isMobile = window.innerWidth <= 768;
+  const baseHeight = isMobile ? window.innerHeight : 600;
+  const extraMargin = isMobile ? 245 : 204;
+  const frameHeight = baseHeight + extraMargin;
+  container.dataset.frameHeight = frameHeight;
+  const pid = page.pageid || page.id;
+  const iframe = createIframeElement(`https://en.wikipedia.org/?curid=${pid}`, frameHeight);
+  contentDiv.appendChild(iframe);
+  container.appendChild(contentDiv);
+  const expandButton = document.createElement('button');
+  expandButton.className = 'expand-button';
+  expandButton.textContent = 'Expand';
+  let expandCount = 0;
+  expandButton.addEventListener('click', () => {
+    expandCount++;
+    const isMobile = window.innerWidth <= 768;
+    const baseHeight = isMobile ? window.innerHeight : 600;
+    const extraMargin = isMobile ? 245 : 204;
+    const newContainerHeight = baseHeight + expandCount * 300;
+    container.style.height = `${newContainerHeight}px`;
+    const newFrameHeight = newContainerHeight + extraMargin;
+    container.dataset.frameHeight = newFrameHeight;
+    const frameElement = contentDiv.firstChild;
+    if (frameElement) {
+      frameElement.style.height = `${newFrameHeight}px`;
+    }
+    if (expandCount > 1) {
+      expandButton.textContent = `Expand (${expandCount}×)`;
+    }
+  });
+  container.appendChild(expandButton);
+  wrapper.appendChild(container);
+  return wrapper;
+}
+
+function showLoading(show) {
+  if (show) {
+    loadingIndicator.classList.remove('hidden');
+  } else {
     loadingIndicator.classList.add('hidden');
   }
 }
