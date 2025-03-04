@@ -43,7 +43,7 @@ const unloadObserver = new IntersectionObserver(
     });
   },
   {
-    rootMargin: '-500px 0px -500px 0px'
+    rootMargin: '0px'
   }
 );
 
